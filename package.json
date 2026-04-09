@@ -1,6 +1,6 @@
 {
   "name": "@vibelogin/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Add authentication to your app without leaving your IDE. MCP server for Cursor, Claude Code, Windsurf, and Cline.",
   "license": "Apache-2.0",
   "type": "module",
