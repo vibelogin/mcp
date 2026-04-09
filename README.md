@@ -1,16 +1,8 @@
 # @vibelogin/mcp
 
-VibeLogin MCP server — zero-touch auth setup for AI coding agents (Cursor, Claude Desktop, Claude Code, Windsurf, Cline, Zed, …).
+Add authentication to your app without leaving your IDE. MCP server for Cursor, Claude Code, Windsurf, and Cline.
 
-Spin up a VibeLogin project, configure auth methods, wire up Google OAuth, and scaffold a working sign-in flow into your codebase — all from inside your editor's chat, without leaving the IDE.
-
----
-
-## What it does
-
-This is a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes VibeLogin as a set of tools any MCP-capable agent can call. The agent decides *when* to use them based on the conversation; you just say "add login to my app" and it takes care of the rest.
-
-The server runs as a local subprocess over stdio, talks to the VibeLogin console via a loopback OAuth flow (RFC 8252 + PKCE S256), and caches a refresh token under `~/.vibelogin/credentials.json` so you only authorize once per month.
+Just say **"add authentication to my app"** — the agent creates your project, configures auth methods, wires up Google OAuth, and scaffolds a working sign-in flow into your codebase. All from your editor's chat.
 
 ---
 
@@ -61,7 +53,7 @@ The first tool call opens a browser for one-click consent. After that, tokens ar
   "mcpServers": {
     "vibelogin": {
       "command": "bunx",
-      "args": ["@vibelogin/mcp"],
+      "args": ["@vibelogin/mcp"]
     }
   }
 }
@@ -75,79 +67,15 @@ That's it — no environment variables needed. Defaults point to production auto
 
 ---
 
-## Authentication flow
+## Authentication
 
-1. The agent calls a tool that needs a token.
-2. If `~/.vibelogin/credentials.json` has a valid (unexpired) access token, it's used as-is.
-3. If the access token is expired but a refresh token is present, the server calls `/api/agent/refresh` (no browser, ~50ms).
-4. If neither works, the server runs the full **loopback OAuth flow**:
-   - Spawns a one-shot HTTP listener on `127.0.0.1:<random>`
-   - Generates a PKCE S256 challenge
-   - Opens `https://app.vibelogin.com/agent/authorize?…` in your browser
-   - You click "Approve" once
-   - Receives the callback, exchanges the code, caches access + refresh tokens
-5. Subsequent tool calls reuse the cached token. Refresh tokens last 30 days; access tokens last 1 hour.
-
-The credentials file is `chmod 600` and rejected if the cached `consoleUrl` doesn't match the current `VIBELOGIN_CONSOLE_URL` (so switching between staging and prod can't reuse the wrong token).
-
----
-
-## How agents decide which tool to call
-
-Every tool definition contains an extensive `description` field with explicit *step number / preconditions / call-before / call-after* hints — the LLM running inside Cursor / Claude Desktop / Windsurf reads those when it's deciding what to do, you don't configure anything yourself.
-
-### The standard onboarding sequence is strictly ordered
-
-For the most common request — "add VibeLogin to my app" — the four data-modifying tools are **sequential** and must run in this order:
-
-```
-STEP 1            STEP 2              STEP 3              STEP 4
-list_projects ──► create_project ──► configure_auth ──► add_auth_to_project
-   (read)           (write)             (write)              (write)
-   always           skip if a           enable methods        scaffold code
-   first            match exists        + Google OAuth        last
-```
-
-Why each step depends on the previous:
-
-| Step | Why it must come first |
-| --- | --- |
-| 1 → 2 | Without `list_projects` you can't tell whether to create or reuse — running `create_project` blindly produces duplicates. |
-| 2 → 3 | `configure_auth` needs a `projectId` that only exists after creation (or lookup). |
-| 3 → 4 | `add_auth_to_project` scaffolds UI for whichever methods are enabled server-side. Skipping step 3 produces a sign-in page that hits `METHOD_DISABLED` at runtime. |
-| 4 = end | After step 4 the user has working code; no further VibeLogin tools should be called unless they ask for changes. |
-
-**Re-entry points** for follow-up requests (you don't restart at step 1):
-
-| User says | Enter at | Notes |
-| --- | --- | --- |
-| "What projects do I have?" | step 1 only | Read-only, stop after. |
-| "I already created one in the dashboard, wire it up" | `get_project` → step 4 | Skip 1 + 2 + 3 if methods are already set. |
-| "Turn on magic link" | step 3 | Need projectId — `list_projects` first if unknown. |
-| "Hook up Google" | step 3 | First call without `google` to get the redirect URI; second call with credentials. |
-| "Add VibeLogin to a NEW app" | step 1 | Full sequence. |
-
-### `auth` is implicit — almost never call it manually
-
-Every other tool calls `requireToken()` internally, which transparently runs **cached → refresh → browser-loopback** with no agent involvement. Only invoke `auth` directly when:
-
-- The user explicitly says "log in", "sign in", "authenticate", or "switch accounts".
-- A previous tool returned `code: "NOT_AUTHENTICATED"` and you want to retry interactively.
+On first use, a browser window opens for one-click consent. After that, you're authenticated for 30 days — no further prompts.
 
 ---
 
 ## Tools
 
-The server advertises six tools via `tools/list`. Agents pick which to call based on your conversation.
-
-### `auth`
-
-Manually run the loopback OAuth flow. You normally won't call this — `requireToken` triggers it automatically when needed.
-
-| Param | Type | Required | Description |
-| --- | --- | --- | --- |
-| `clientName` | string | no | Label shown on the consent screen (default `"VibeLogin MCP"`). |
-| `noBrowser` | boolean | no | Print the authorize URL to stderr instead of opening a browser. Useful for SSH / headless environments. |
+The agent picks the right tools automatically based on your conversation. Just say what you need.
 
 ### `create_project`
 
@@ -238,38 +166,7 @@ Next steps printed by the tool:
 
 ---
 
-## Error handling
-
-Tool failures are returned as MCP `isError: true` results with a structured payload so agents can branch on the failure mode instead of regex-matching free text:
-
-```json
-{
-  "isError": true,
-  "structuredContent": {
-    "code": "UNSUPPORTED_FRAMEWORK",
-    "message": "Automated scaffolding currently supports Next.js App Router and Vite + React. …",
-    "details": { "detected": "remix", "reason": "found `@remix-run/*` in dependencies" }
-  },
-  "content": [
-    { "type": "text", "text": "[UNSUPPORTED_FRAMEWORK] Automated scaffolding…" }
-  ]
-}
-```
-
-Current error codes:
-
-| Code | When |
-| --- | --- |
-| `NOT_AUTHENTICATED` | Loopback flow ran but no valid token was persisted. |
-| `STATE_MISMATCH` | OAuth callback `state` did not match — possible CSRF, aborted. |
-| `UNSUPPORTED_FRAMEWORK` | `add_auth_to_project` could not detect a supported framework. |
-| `INTERNAL_ERROR` | Anything else (`details` not populated). |
-
-API-side failures (`api_error: <code> — <msg>`) are still returned as `INTERNAL_ERROR`; they will get their own codes in a future release.
-
----
-
-## Example agent conversations
+## Example conversations
 
 > **You:** "Add VibeLogin to this Next.js app. Email + password and Google sign-in."
 >
@@ -289,62 +186,22 @@ API-side failures (`api_error: <code> — <msg>`) are still returned as `INTERNA
 
 ---
 
-## Architecture
-
-```
-┌──────────────┐  stdio JSON-RPC  ┌────────────────┐
-│  IDE / Chat  │ ───────────────► │ @vibelogin/mcp │
-│  (Cursor,    │ ◄─────────────── │   subprocess   │
-│   Claude…)   │                  └────────┬───────┘
-└──────────────┘                           │
-                                           │ HTTPS
-                                           ▼
-                                  ┌─────────────────┐
-                                  │ console         │
-                                  │ /agent/authorize│  ◄── browser loopback
-                                  │ /api/agent/token│      (PKCE S256)
-                                  │ /api/agent/refresh│
-                                  └────────┬────────┘
-                                           │ issues HS256 platform JWT
-                                           ▼
-                                  ┌─────────────────┐
-                                  │ Hono API        │
-                                  │ /v1/platform/*  │
-                                  └─────────────────┘
-```
-
-- **Transport:** stdio, one JSON-RPC 2.0 message per line.
-- **Logging:** stderr only (stdout would corrupt the protocol).
-- **Zero deps:** no `@modelcontextprotocol/sdk` — the protocol subset we use is small and stable, and zero deps means `bunx @vibelogin/mcp` is instant.
-
----
-
 ## Security
 
-- **Loopback OAuth + PKCE S256** (RFC 8252 + RFC 7636) — no client secret embedded in the agent.
-- **Single-use authorization codes** with 2-minute TTL, deleted on first lookup (no brute-force window for the verifier).
-- **Rotated refresh tokens** — every successful refresh invalidates the old refresh token. Replay of a leaked token after legitimate use will fail.
-- **`chmod 600`** on `~/.vibelogin/credentials.json`.
-- **Console-URL scoping:** the cached token is rejected if the configured `VIBELOGIN_CONSOLE_URL` doesn't match the URL it was issued against. Switching between staging and prod cannot accidentally reuse the wrong token.
-- **CSRF protection:** loopback callbacks must echo the OAuth `state` value the server generated; mismatches abort with `STATE_MISMATCH`.
+- **No secrets in the agent** — authentication uses loopback OAuth + PKCE (RFC 8252)
+- **Single-use authorization codes** with 2-minute TTL
+- **Rotated refresh tokens** — every refresh invalidates the previous one
+- **Credentials stored securely** — `chmod 600` on `~/.vibelogin/credentials.json`
 
 ---
 
-## Development
+## Supported frameworks
 
-```bash
-# from the monorepo root
-pnpm install
-pnpm --filter @vibelogin/mcp build      # tsc check (no emit)
-
-# run the server directly (talks to local console + api)
-bun packages/mcp/src/index.ts
-
-# run the unit tests
-cd packages/mcp && bun test
-```
-
-Tests cover the loopback flow (PKCE, URL builder, listener success/error/missing/timeout) and the stdio dispatcher.
+| Framework | Status |
+| --- | --- |
+| Next.js (App Router) | Fully supported |
+| Vite + React | Fully supported |
+| Remix, Astro, Express | Coming soon |
 
 ---
 

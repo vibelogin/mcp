@@ -1,7 +1,7 @@
 {
   "name": "@vibelogin/mcp",
   "version": "0.1.0",
-  "description": "VibeLogin MCP server — zero-touch auth for AI coding agents (Cursor, Claude Desktop, Windsurf, Cline). Say 'add authentication' and it's done.",
+  "description": "Add authentication to your app without leaving your IDE. MCP server for Cursor, Claude Code, Windsurf, and Cline.",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
@@ -32,12 +32,11 @@
   "mcpName": "io.github.vibelogin/vibeauth",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vibelogin/vibeauth.git",
-    "directory": "packages/mcp"
+    "url": "https://github.com/vibelogin/mcp.git"
   },
   "homepage": "https://vibelogin.com/docs/mcp",
   "bugs": {
-    "url": "https://github.com/vibelogin/vibeauth/issues"
+    "url": "https://github.com/vibelogin/mcp/issues"
   },
   "private": false,
   "engines": {
