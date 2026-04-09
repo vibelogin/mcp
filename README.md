@@ -71,36 +71,7 @@ The first tool call opens a browser for one-click consent. After that, tokens ar
 
 Same shape — every MCP client accepts a `command` + `args` block. The one-liner above works in all of them.
 
-### Local development against your own console
-
-Override the defaults to point at localhost:
-
-```json
-{
-  "mcpServers": {
-    "vibelogin": {
-      "command": "bunx",
-      "args": ["@vibelogin/mcp"],
-      "env": {
-        "VIBELOGIN_API_URL": "http://localhost:3000",
-        "VIBELOGIN_CONSOLE_URL": "http://localhost:3002"
-      }
-    }
-  }
-}
-```
-
----
-
-## Environment variables
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `VIBELOGIN_API_URL` | `https://api.vibelogin.com` | API base URL — what the platform tools talk to. |
-| `VIBELOGIN_CONSOLE_URL` | `https://app.vibelogin.com` | Console base URL — used for the loopback OAuth flow. |
-| `VIBELOGIN_HOME` | `~/.vibelogin` | Where credentials are cached. |
-
-All optional — defaults point to production. Override in your MCP client config to point at staging or local dev.
+That's it — no environment variables needed. Defaults point to production automatically.
 
 ---
 
