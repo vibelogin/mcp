@@ -1,6 +1,6 @@
 {
   "name": "@vibelogin/mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Add authentication to your app without leaving your IDE. MCP server for Cursor, Claude Code, Windsurf, and Cline.",
   "license": "Apache-2.0",
   "type": "module",
@@ -29,7 +29,7 @@
     "nextjs",
     "vibe-coding"
   ],
-  "mcpName": "io.github.vibelogin/vibeauth",
+  "mcpName": "io.github.snrniranjan/vibelogin-mcp",
   "repository": {
     "type": "git",
     "url": "https://github.com/vibelogin/mcp.git"
