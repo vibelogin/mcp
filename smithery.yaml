@@ -1,0 +1,21 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      apiUrl:
+        type: string
+        description: "VibeLogin API base URL (default: https://api.vibelogin.com)"
+      consoleUrl:
+        type: string
+        description: "VibeLogin Console base URL (default: https://app.vibelogin.com)"
+    required: []
+  commandFunction: |-
+    (config) => ({
+      command: "bunx",
+      args: ["@vibelogin/mcp"],
+      env: {
+        ...(config.apiUrl ? { VIBELOGIN_API_URL: config.apiUrl } : {}),
+        ...(config.consoleUrl ? { VIBELOGIN_CONSOLE_URL: config.consoleUrl } : {})
+      }
+    })
